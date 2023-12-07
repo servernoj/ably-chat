@@ -29,6 +29,11 @@ const props = defineProps<{
     padding: 0.5em;
     display: flex;
     align-items: flex-start;
+    &.my-message {
+      .content > .header > .name {
+        font-weight: bold;
+      }
+    }
     .image {
       height: 50px;
     }

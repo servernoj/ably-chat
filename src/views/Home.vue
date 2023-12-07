@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useStorage } from '@vueuse/core'
 import { useRouter } from 'vue-router'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue'
 import type { QuibleTokens } from './Login.vue'
 import { useLoading } from 'vue-loading-overlay'
 import * as Ably from 'ably'
@@ -9,12 +9,13 @@ import axios from 'axios'
 import 'vue-loading-overlay/dist/css/index.css'
 import Message from '@/components/message.vue'
 
+// types
 type MessageItem = {
+  userId: string
   name: string,
-  timestamp: string,
+  timestamp: number,
   text: string
 }
-
 type User = {
   email: string
   full_name: string,
@@ -22,10 +23,9 @@ type User = {
   phone: string,
   username: string
 }
-
-type UserIdCache = {
+type UserIdCache = Partial<{
   [id: string]: User
-}
+}>
 // constants
 const EventMessage = 'Message'
 const ChannelName = 'chat:main'
@@ -35,11 +35,17 @@ const channel = ref<Ably.Types.RealtimeChannelPromise>()
 const input = ref('')
 const me = ref<User|null>(null)
 const messages = ref<MessageItem[]>([])
-const userIdCache: Partial<UserIdCache> = {}
+const userIdCache: UserIdCache = {}
+const messageConatiner = ref<HTMLElement|null>(null)
+const sortedMessages = computed(
+  () => messages.value.slice().sort(
+    (a, b) => a.timestamp - b.timestamp
+  )
+)
 // composables
 const router = useRouter()
 const quibleTokens = useStorage<QuibleTokens>('tokens', {})
-// Handlers
+// handlers
 const getUser = (userId: string): Promise<User | null> => {
   if (userId in userIdCache) {
     return Promise.resolve(userIdCache[userId] ?? null)
@@ -76,34 +82,39 @@ const onLogout = () => {
   router.push({ name: 'Login' })
 }
 const onSend = async () => {
-  if (channel.value) {
-    await channel.value.publish(EventMessage, input.value)
-  }
+  await channel.value?.publish(EventMessage, input.value)
   input.value = ''
 }
 const onChatMessage = async (message: Ably.Types.Message) => {
   const user = await getUser(message.clientId)
   if (user) {
     messages.value.push({
+      userId: message.clientId,
       name: user.full_name,
-      timestamp: new Date(message.timestamp).toLocaleString(),
+      timestamp: message.timestamp,
       text: message.data
+    })
+    nextTick(() => {
+      const el = messageConatiner.value
+      if (el) {
+        el.scrollTop = el.scrollHeight
+      }
     })
   }
 }
-
+// lifecycle handlers
 onUnmounted(
   async () => {
     await channel.value?.unsubscribe(EventMessage, onChatMessage)
+    await channel.value?.detach()
   }
 )
-
 onMounted(
   async () => {
     const loader = useLoading({
       backgroundColor: '#888'
     }).show()
-    // test the access_token
+    // test the stored access_token
     if (
       !quibleTokens.value?.access_token ||
       !(await isTokenGood(quibleTokens.value.access_token))
@@ -122,7 +133,9 @@ onMounted(
     })
     await realtime.value.connection.once('connected')
     // channel
-    channel.value = realtime.value.channels.get(ChannelName)
+    channel.value = realtime.value.channels.get(ChannelName, {
+      params: { rewind: '10m' }
+    })
     await channel.value.subscribe(EventMessage, onChatMessage)
     // clientId
     me.value = await getUser(realtime.value.auth.clientId)
@@ -130,7 +143,6 @@ onMounted(
     loader.hide()
   }
 )
-
 </script>
 
 <template>
@@ -144,13 +156,14 @@ onMounted(
       </section>
     </nav>
     <article class="chat">
-      <section class="messages">
+      <section id="mc" ref="messageConatiner" class="messages">
         <Message
-          v-for="msg,idx in messages"
+          v-for="msg,idx in sortedMessages"
           :key="idx"
           :name="msg.name"
-          :timestamp="msg.timestamp"
+          :timestamp="new Date(msg.timestamp).toLocaleString()"
           :text="msg.text"
+          :class="{'my-message': msg.userId === me?.id}"
         />
       </section>
       <form class="input">
