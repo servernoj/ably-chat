@@ -21,12 +21,13 @@ const router = createRouter({
 })
 router.beforeEach(
   async (to) => {
-    const quibleTokens = useStorage<QuibleTokens>('tokens', null)
+    const quibleTokens = useStorage<QuibleTokens>('tokens', {})
     if (
       to.meta.requiresAuth &&
       to.name !== 'Login' &&
-      !quibleTokens.value
+      !quibleTokens.value?.access_token
     ) {
+      quibleTokens.value = null
       return { name: 'Login' }
     }
   }

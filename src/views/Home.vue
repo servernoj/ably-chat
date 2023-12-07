@@ -22,6 +22,10 @@ type User = {
   phone: string,
   username: string
 }
+
+type UserIdCache = {
+  [id: string]: User
+}
 // constants
 const EventMessage = 'Message'
 const ChannelName = 'chat:main'
@@ -31,22 +35,42 @@ const channel = ref<Ably.Types.RealtimeChannelPromise>()
 const input = ref('')
 const me = ref<User|null>(null)
 const messages = ref<MessageItem[]>([])
+const userIdCache: Partial<UserIdCache> = {}
 // composables
 const router = useRouter()
 const quibleTokens = useStorage<QuibleTokens>('tokens', {})
 // Handlers
-const getUser = (userId: string) => axios<User>({
-  method: 'GET',
-  url: `${import.meta.env.VITE_QUIBLE_API}/user/${userId}`,
-  headers: {
-    Authorization: `Bearer ${quibleTokens.value.access_token}`
+const getUser = (userId: string): Promise<User | null> => {
+  if (userId in userIdCache) {
+    return Promise.resolve(userIdCache[userId] ?? null)
   }
-})
-  .then(({ data }) => data)
-  .catch(error => {
-    console.error(error)
-    return null
+  return axios<User>({
+    method: 'GET',
+    url: `${import.meta.env.VITE_QUIBLE_API}/user/${userId}`,
+    headers: {
+      Authorization: `Bearer ${quibleTokens.value.access_token}`
+    }
   })
+    .then(({ data }) => {
+      userIdCache[userId] = data
+      return data
+    })
+    .catch(error => {
+      console.error(error)
+      return null
+    })
+}
+const isTokenGood = async (token: string): Promise<boolean> => {
+  return axios<User>({
+    method: 'GET',
+    url: `${import.meta.env.VITE_QUIBLE_API}/user`,
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  })
+    .then(({ data }) => Boolean(data?.id))
+    .catch(() => false)
+}
 const onLogout = () => {
   quibleTokens.value = null
   router.push({ name: 'Login' })
@@ -79,6 +103,16 @@ onMounted(
     const loader = useLoading({
       backgroundColor: '#888'
     }).show()
+    // test the access_token
+    if (
+      !quibleTokens.value?.access_token ||
+      !(await isTokenGood(quibleTokens.value.access_token))
+    ) {
+      loader.hide()
+      quibleTokens.value = null
+      router.push({ name: 'Login' })
+    }
+    // initialize the realtime engine (ably)
     realtime.value = new Ably.Realtime.Promise({
       authMethod: 'GET',
       authHeaders: {
