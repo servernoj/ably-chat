@@ -84,9 +84,7 @@ const submit = async () => {
     align-items: center;
   }
   .login-form {
-    width: 50%;
-    max-width: 300px;
-    border: 1px solid grey;
+    // border: 1px solid grey;
     padding: 1em;
     margin-top: 1em;
     .input-field {
@@ -94,6 +92,7 @@ const submit = async () => {
       display: flex;
       margin: 0.5em 0;
       justify-content: space-between;
+      gap: 1em;
       span {
         flex-basis: 100px;
       }
@@ -103,7 +102,7 @@ const submit = async () => {
     }
     .controls {
       width: 100%;
-      margin-top: 1em;
+      margin-top: 2em;
       display: flex;
       justify-content: flex-end;
     }

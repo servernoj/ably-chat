@@ -107,6 +107,7 @@ onUnmounted(
   async () => {
     await channel.value?.unsubscribe(EventMessage, onChatMessage)
     await channel.value?.detach()
+    realtime.value?.channels.release(ChannelName)
   }
 )
 onMounted(
@@ -122,6 +123,7 @@ onMounted(
       loader.hide()
       quibleTokens.value = null
       router.push({ name: 'Login' })
+      return
     }
     // initialize the realtime engine (ably)
     realtime.value = new Ably.Realtime.Promise({
