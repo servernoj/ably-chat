@@ -37,6 +37,9 @@ const props = defineProps<{
     padding: 0.5em;
     display: flex;
     align-items: flex-start;
+    &:hover {
+      background-color: rgba(0,0,0,0.1)
+    }
     &.my-message {
       .content > .header > .name {
         font-weight: bold;
