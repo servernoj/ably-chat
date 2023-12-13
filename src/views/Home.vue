@@ -26,7 +26,7 @@ type User = {
   image: string | null
 }
 type UserIdCache = Partial<{
-  [id: string]: User
+  [id: string]: User | null
 }>
 // constants
 const EventMessage = 'Message'
@@ -62,6 +62,7 @@ const getUser = (userId: string): Promise<User | null> => {
     })
     .catch(error => {
       console.error(error)
+      userIdCache[userId] = null
       return null
     })
 }
