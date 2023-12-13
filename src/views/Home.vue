@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useStorage } from '@vueuse/core'
 import { useRouter } from 'vue-router'
-import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue'
+import { onMounted, onUnmounted, ref, nextTick } from 'vue'
 import type { QuibleTokens } from './Login.vue'
 import { useLoading } from 'vue-loading-overlay'
 import * as Ably from 'ably'
@@ -12,16 +12,18 @@ import Message from '@/components/message.vue'
 // types
 type MessageItem = {
   userId: string
-  name: string,
-  timestamp: number,
+  name: string
+  timestamp: number
   text: string
+  image: string | null
 }
 type User = {
   email: string
-  full_name: string,
-  id: string,
-  phone: string,
+  full_name: string
+  id: string
+  phone: string
   username: string
+  image: string | null
 }
 type UserIdCache = Partial<{
   [id: string]: User
@@ -37,22 +39,19 @@ const me = ref<User|null>(null)
 const messages = ref<MessageItem[]>([])
 const userIdCache: UserIdCache = {}
 const messageConatiner = ref<HTMLElement|null>(null)
-const sortedMessages = computed(
-  () => messages.value.slice().sort(
-    (a, b) => a.timestamp - b.timestamp
-  )
-)
 // composables
 const router = useRouter()
 const quibleTokens = useStorage<QuibleTokens>('tokens', {})
 // handlers
 const getUser = (userId: string): Promise<User | null> => {
   if (userId in userIdCache) {
+    console.log(userId, 'hit')
     return Promise.resolve(userIdCache[userId] ?? null)
   }
+  console.log(userId, 'miss')
   return axios<User>({
     method: 'GET',
-    url: `${import.meta.env.VITE_QUIBLE_API}/user/${userId}`,
+    url: `${import.meta.env.VITE_QUIBLE_API}/user/${userId}/profile`,
     headers: {
       Authorization: `Bearer ${quibleTokens.value.access_token}`
     }
@@ -89,8 +88,9 @@ const onChatMessage = async (message: Ably.Types.Message) => {
   const user = await getUser(message.clientId)
   if (user) {
     messages.value.push({
-      userId: message.clientId,
+      userId: user.id,
       name: user.full_name,
+      image: user.image,
       timestamp: message.timestamp,
       text: message.data
     })
@@ -134,13 +134,36 @@ onMounted(
       authUrl: `${import.meta.env.VITE_QUIBLE_API}/rt/token`
     })
     await realtime.value.connection.once('connected')
-    // channel
-    channel.value = realtime.value.channels.get(ChannelName, {
-      params: { rewind: '10m' }
-    })
-    await channel.value.subscribe(EventMessage, onChatMessage)
     // clientId
     me.value = await getUser(realtime.value.auth.clientId)
+    // channel
+    channel.value = await realtime.value.channels.get(ChannelName)
+    await channel.value.attach()
+    const oldMessages = await channel.value.history({ untilAttach: true })
+    messages.value = await oldMessages.items.reverse().reduce(
+      async (acc, message) => {
+        const racc = await acc
+        const user = await getUser(message.clientId).catch(() => null)
+        if (user) {
+          racc.push({
+            userId: user.id,
+            name: user.full_name,
+            image: user.image,
+            timestamp: message.timestamp,
+            text: message.data
+          })
+        }
+        return racc
+      },
+      Promise.resolve([] as MessageItem[])
+    )
+    nextTick(() => {
+      const el = messageConatiner.value
+      if (el) {
+        el.scrollTop = el.scrollHeight
+      }
+    })
+    await channel.value.subscribe(EventMessage, onChatMessage)
     // spinner
     loader.hide()
   }
@@ -159,14 +182,16 @@ onMounted(
     </nav>
     <article class="chat">
       <section id="mc" ref="messageConatiner" class="messages">
-        <Message
-          v-for="msg,idx in sortedMessages"
-          :key="idx"
-          :name="msg.name"
-          :timestamp="new Date(msg.timestamp).toLocaleString()"
-          :text="msg.text"
-          :class="{'my-message': msg.userId === me?.id}"
-        />
+        <template v-for="msg,idx in messages" :key="idx">
+          <Message
+            :user-id="msg.userId"
+            :image="msg.image"
+            :name="msg.name"
+            :timestamp="new Date(msg.timestamp).toLocaleString()"
+            :text="msg.text"
+            :class="{'my-message': msg.userId === me?.id}"
+          />
+        </template>
       </section>
       <form class="input">
         <input

@@ -1,14 +1,22 @@
 <script setup lang="ts">
 const props = defineProps<{
+  userId: string
   name: string
   timestamp: string
   text: string
+  image: string | null
 }>()
 </script>
 
 <template>
   <div class="message-container">
-    <img src="@/assets/avatar-svgrepo-com.svg" class="image">
+    <img
+      v-if="props.image"
+      :src="props.image"
+      class="image"
+      :data-timestamp="props.timestamp"
+    >
+    <img v-else src="@/assets/avatar-svgrepo-com.svg" class="image">
     <article class="content">
       <section class="header">
         <h3 class="name">
@@ -35,7 +43,7 @@ const props = defineProps<{
       }
     }
     .image {
-      height: 50px;
+      width: 50px;
     }
     .content {
       margin-left: 1em;

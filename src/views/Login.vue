@@ -39,11 +39,11 @@ const submit = async () => {
   if (tokens) {
     showErrorPanel.value = false
     quibleTokens.value = tokens
-    loader.hide()
     router.push({ name: 'Home' })
   } else {
     showErrorPanel.value = true
   }
+  loader.hide()
 }
 </script>
 
@@ -84,7 +84,6 @@ const submit = async () => {
     align-items: center;
   }
   .login-form {
-    // border: 1px solid grey;
     padding: 1em;
     margin-top: 1em;
     .input-field {
