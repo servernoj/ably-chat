@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { useStorage } from '@vueuse/core'
 import { useRouter } from 'vue-router'
-import { onMounted, onUnmounted, ref, nextTick } from 'vue'
-import type { QuibleTokens } from './Login.vue'
+import { onMounted, onUnmounted, ref, nextTick, inject } from 'vue'
 import { useLoading } from 'vue-loading-overlay'
 import * as Ably from 'ably'
 import axios from 'axios'
 import 'vue-loading-overlay/dist/css/index.css'
 import Message from '@/components/message.vue'
+import { getToken } from '@/bridge'
 
 // types
 type MessageItem = {
@@ -39,9 +38,10 @@ const me = ref<User|null>(null)
 const messages = ref<MessageItem[]>([])
 const userIdCache: UserIdCache = {}
 const messageConatiner = ref<HTMLElement|null>(null)
+const accessToken = ref<string>()
+const isWebView = inject('isWebView')
 // composables
 const router = useRouter()
-const quibleTokens = useStorage<QuibleTokens>('tokens', {})
 // handlers
 const getUser = (userId: string): Promise<User | null> => {
   if (userId in userIdCache) {
@@ -53,7 +53,7 @@ const getUser = (userId: string): Promise<User | null> => {
     method: 'GET',
     url: `${import.meta.env.VITE_QUIBLE_API}/user/${userId}/profile`,
     headers: {
-      Authorization: `Bearer ${quibleTokens.value.access_token}`
+      Authorization: `Bearer ${accessToken.value}`
     }
   })
     .then(({ data }) => {
@@ -78,7 +78,6 @@ const isTokenGood = async (token: string): Promise<boolean> => {
     .catch(() => false)
 }
 const onLogout = () => {
-  quibleTokens.value = null
   router.push({ name: 'Login' })
 }
 const onSend = async () => {
@@ -116,21 +115,24 @@ onMounted(
     const loader = useLoading({
       backgroundColor: '#888'
     }).show()
+    // get the token
+    accessToken.value = await getToken()
     // test the stored access_token
     if (
-      !quibleTokens.value?.access_token ||
-      !(await isTokenGood(quibleTokens.value.access_token))
+      !accessToken.value ||
+      !(await isTokenGood(accessToken.value))
     ) {
       loader.hide()
-      quibleTokens.value = null
-      router.push({ name: 'Login' })
+      if (!isWebView) {
+        onLogout()
+      }
       return
     }
     // initialize the realtime engine (ably)
     realtime.value = new Ably.Realtime.Promise({
       authMethod: 'GET',
       authHeaders: {
-        Authorization: `Bearer ${quibleTokens.value.access_token}`
+        Authorization: `Bearer ${accessToken.value}`
       },
       authUrl: `${import.meta.env.VITE_QUIBLE_API}/rt/token`
     })
@@ -177,7 +179,7 @@ onMounted(
       <section class="left">
         <h3>{{ me?.full_name ?? "" }}</h3>
       </section>
-      <section class="right">
+      <section v-if="!isWebView" class="right">
         <a href="" class="link" @click.prevent="onLogout">Logout</a>
       </section>
     </nav>

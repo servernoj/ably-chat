@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useStorage } from '@vueuse/core'
 import Home from '../views/Home.vue'
-import type { QuibleTokens } from '../views/Login.vue'
+import { getToken } from '@/bridge'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -21,13 +20,12 @@ const router = createRouter({
 })
 router.beforeEach(
   async (to) => {
-    const quibleTokens = useStorage<QuibleTokens>('tokens', {})
+    const accessToken = await getToken()
     if (
       to.meta.requiresAuth &&
-      to.name !== 'Login' &&
-      !quibleTokens.value?.access_token
+        to.name !== 'Login' &&
+        !accessToken
     ) {
-      quibleTokens.value = null
       return { name: 'Login' }
     }
   }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useStorage } from '@vueuse/core'
 import { useRouter } from 'vue-router'
@@ -21,6 +21,10 @@ const credentials = ref<QuibleCredentials>({
   email: 'abcdz@gmail.com',
   password: 'password'
 })
+onMounted(() => {
+  quibleTokens.value = null
+})
+
 // --
 const login = (credentials: QuibleCredentials) => axios.post<QuibleTokens>(
   `${import.meta.env.VITE_QUIBLE_API}/login`,
