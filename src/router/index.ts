@@ -21,7 +21,6 @@ const router = createRouter({
 router.beforeEach(
   async (to) => {
     const accessToken = await getToken()
-    alert(accessToken)
     if (
       to.meta.requiresAuth &&
         to.name !== 'Login' &&
