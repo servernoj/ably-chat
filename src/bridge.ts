@@ -19,6 +19,7 @@ export const registerWKWebViewJavascriptBridge = (w: Window): boolean => {
     console.log('WKWebViewJavascriptBridge has been injected externally')
     return true
   } else {
+    alert('Emulating WKWebViewJavascriptBridge...')
     Object.assign(w, {
       WKWebViewJavascriptBridge: {
         callHandler: (key: string, params: Object, cb: (s?: string) => {}) => {
