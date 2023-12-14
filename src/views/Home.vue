@@ -28,6 +28,7 @@ type UserIdCache = Partial<{
   [id: string]: User | null
 }>
 // constants
+const HISTORY_LENGTH = 20 * 60 * 1000
 const EventMessage = 'Message'
 const ChannelName = 'chat:main'
 // reactive state
@@ -142,7 +143,10 @@ onMounted(
     // channel
     channel.value = await realtime.value.channels.get(ChannelName)
     await channel.value.attach()
-    const oldMessages = await channel.value.history({ untilAttach: true })
+    const oldMessages = await channel.value.history({
+      start: new Date().getTime() - HISTORY_LENGTH,
+      untilAttach: true
+    })
     messages.value = await oldMessages.items.reverse().reduce(
       async (acc, message) => {
         const racc = await acc
